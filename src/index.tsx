@@ -13,7 +13,7 @@ declare global {
 /**
  * The shape of the context provider
  */
-type GTMHookProviderProps = { states?: ISnippetsParams[]; children: ReactNode }
+type GTMHookProviderProps = { states?: ISnippetsParams | ISnippetsParams[]; children: ReactNode }
 
 /**
  * The shape of the hook
@@ -65,13 +65,21 @@ function GTMProvider({ states, children }: GTMHookProviderProps): JSX.Element {
   const [store, dispatch] = useReducer(dataReducer, [])
 
   useEffect(() => {
-    states?.forEach((state) => {
-      if (state.injectScript !== false) {
-        const mergedState = { ...initialState, ...state }
+    if (Array.isArray(states)) {
+      states?.forEach((state) => {
+        if (state.injectScript !== false) {
+          const mergedState = { ...initialState, ...state }
+          initGTM(mergedState)
+        }
+      })
+      dispatch({ type: 'ADD_STATE', states })
+    } else {
+      if (states?.injectScript !== false) {
+        const mergedState = { ...initialState, ...states }
         initGTM(mergedState)
+        dispatch({ type: 'ADD_STATE', states: [mergedState] })
       }
-    })
-    dispatch({ type: 'ADD_STATE', states: states })
+    }
   }, [states])
 
   return (
