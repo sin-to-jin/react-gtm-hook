@@ -13,7 +13,7 @@ declare global {
 /**
  * The shape of the context provider
  */
-type GTMHookProviderProps = { state?: ISnippetsParams; children: ReactNode }
+type GTMHookProviderProps = { states?: ISnippetsParams[]; children: ReactNode }
 
 /**
  * The shape of the hook
@@ -45,11 +45,11 @@ export const GTMContextDispatch = createContext<
 
 function dataReducer(
   state: ISnippetsParams[],
-  action: { type: string; state?: ISnippetsParams; data?: ISendToGTM['data'] }
+  action: { type: string; states?: ISnippetsParams[]; data?: ISendToGTM['data'] }
 ) {
   switch (action.type) {
     case 'ADD_STATE':
-      return [...state, action.state!]
+      return [...state, ...(action.states || [])]
     case 'SEND_TO_GTM':
       state.forEach((s) => sendToGTM({ data: action.data!, dataLayerName: s.dataLayerName! }))
       return state
@@ -61,16 +61,18 @@ function dataReducer(
 /**
  * The Google Tag Manager Provider
  */
-function GTMProvider({ state, children }: GTMHookProviderProps): JSX.Element {
+function GTMProvider({ states, children }: GTMHookProviderProps): JSX.Element {
   const [store, dispatch] = useReducer(dataReducer, [])
 
   useEffect(() => {
-    if (!state || state.injectScript == false) return
-    const mergedState = { ...initialState, ...state }
-
-    initGTM(mergedState)
-    dispatch({ type: 'ADD_STATE', state: mergedState })
-  }, [JSON.stringify(state)])
+    states?.forEach((state) => {
+      if (state.injectScript !== false) {
+        const mergedState = { ...initialState, ...state }
+        initGTM(mergedState)
+      }
+    })
+    dispatch({ type: 'ADD_STATE', states: states })
+  }, [states])
 
   return (
     <GTMContext.Provider value={store}>
