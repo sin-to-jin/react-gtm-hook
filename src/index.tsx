@@ -1,4 +1,4 @@
-import React, { Context, ReactNode, createContext, useEffect, useContext, useReducer } from 'react'
+import React, { Context, ReactNode, createContext, useEffect, useContext, useReducer, Dispatch } from 'react'
 
 import { ISendToGTM, ISnippetsParams } from './models/GoogleTagManager'
 import { initGTM, sendToGTM } from './utils/GoogleTagManager'
@@ -38,25 +38,38 @@ export const initialState: ISnippetsParams = {
 /**
  * The context
  */
-export const GTMContext = createContext<ISnippetsParams | undefined>(initialState)
-export const GTMContextDispatch = createContext<((data: ISendToGTM['data']) => void) | undefined>(undefined)
+export const GTMContext = createContext<ISnippetsParams[] | undefined>(undefined)
+export const GTMContextDispatch = createContext<
+  Dispatch<{ type: string; state?: ISnippetsParams; data?: ISendToGTM['data'] }> | undefined
+>(undefined)
 
-function dataReducer(state: ISnippetsParams, data: any) {
-  sendToGTM({ data, dataLayerName: state?.dataLayerName! })
-  return state
+function dataReducer(
+  state: ISnippetsParams[],
+  action: { type: string; state?: ISnippetsParams; data?: ISendToGTM['data'] }
+) {
+  switch (action.type) {
+    case 'ADD_STATE':
+      return [...state, action.state!]
+    case 'SEND_TO_GTM':
+      state.forEach((s) => sendToGTM({ data: action.data!, dataLayerName: s.dataLayerName! }))
+      return state
+    default:
+      return state
+  }
 }
 
 /**
  * The Google Tag Manager Provider
  */
 function GTMProvider({ state, children }: GTMHookProviderProps): JSX.Element {
-  const [store, dispatch] = useReducer(dataReducer, { ...initialState, ...state })
+  const [store, dispatch] = useReducer(dataReducer, [])
 
   useEffect(() => {
     if (!state || state.injectScript == false) return
-    const mergedState = { ...store, ...state }
+    const mergedState = { ...initialState, ...state }
 
     initGTM(mergedState)
+    dispatch({ type: 'ADD_STATE', state: mergedState })
   }, [JSON.stringify(state)])
 
   return (
@@ -72,7 +85,9 @@ function useGTMDispatch() {
     throw new Error('dispatchGTMEvent must be used within a GTMProvider')
   }
 
-  return context
+  return (data: ISendToGTM['data']) => {
+    context({ type: 'SEND_TO_GTM', data: data })
+  }
 }
 
 export { GTMProvider, useGTMDispatch, sendToGTM }
